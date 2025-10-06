@@ -52,8 +52,7 @@ app.use((req, res, next) => {
 
 const requiresAuthentication = (req, res, next) => {
   if (!res.locals.signedIn) {
-    console.log("Unauthorized");
-    res.static(401).send("Unauthorized.");
+    res.redirect(302, '/users/signin');
   } else {
     next();
   }
@@ -65,11 +64,11 @@ app.get("/", (req, res) => {
 });
 
 // Render the list of todo lists
-app.get("/lists", catchError(async (req, res, next) => {
+app.get("/lists",
+  requiresAuthentication,
+  catchError(async (req, res, next) => {
   let store = res.locals.store;
-  console.log(store._todoLists);
   let todoLists = await store.sortedTodoLists();
-  console.log({todoLists});
   
   let todosInfo = todoLists.map(todoList => ({
     countAllTodos: todoList.todos.length,
@@ -78,8 +77,8 @@ app.get("/lists", catchError(async (req, res, next) => {
   }));
 
   res.render("lists", {
-    todoLists,
-    todosInfo,
+  todoLists,
+  todosInfo,
   });
 }));
 
@@ -134,7 +133,8 @@ app.post("/lists",
 );
 
 // Render individual todo list and its todos
-app.get("/lists/:todoListId", 
+app.get("/lists/:todoListId",
+  requiresAuthentication,
   catchError(async (req, res, next) => {
     let todoListId = req.params.todoListId;
     let todoList = await res.locals.store.loadTodoList(+todoListId);
@@ -143,14 +143,15 @@ app.get("/lists/:todoListId",
       throw new Error("Not found.");
     } else {
       todoList.todos = await res.locals.store.sortedTodos(todoList);
-      console.log('todoList.todos:', todoList.todos);
+
       res.render("list", {
-        todoList: todoList,
-        isDoneTodoList: res.locals.store.isDoneTodoList(todoList),
-        hasUndoneTodos: res.locals.store.hasUndoneTodos(todoList),
+      todoList: todoList,
+      isDoneTodoList: res.locals.store.isDoneTodoList(todoList),
+      hasUndoneTodos: res.locals.store.hasUndoneTodos(todoList),
       });
     }
-}));
+  })
+);
 
 // Toggle completion status of a todo
 app.post("/lists/:todoListId/todos/:todoId/toggle", 
@@ -329,19 +330,22 @@ app.get('/users/signin', (req, res, next) => {
 });
 
 // Sign in the user
-app.post('/users/signin', (req, res) => {
-  let { username, password } = req.body;
-  username = username.trim();
-  if (username === 'admin' && password === 'secret') {
-    req.session.username = username;
-    req.session.signedIn = true;
-    req.flash('success', 'Welcome!');
-    res.redirect('/lists');
-  } else {
-    req.flash('error', 'Invalid credentials.');
-    res.render('signin', { username: req.body.username, flash: req.flash() });
-  }
-});
+app.post('/users/signin',
+  catchError(async (req, res) => {
+    let { username, password } = req.body;
+    username = username.trim();
+    let isValid = await res.locals.store.validateCredentials(username, password);
+    if (!isValid) {
+      req.flash('error', 'Invalid credentials.');
+      res.render('signin', { username: req.body.username, flash: req.flash() });
+    } else {
+      req.session.username = username;
+      req.session.signedIn = true;
+      req.flash('success', 'Welcome!');
+      res.redirect('/lists');
+    }
+  })
+);
 
 // Sign out user
 app.post('/users/signout', (req, res) => {
