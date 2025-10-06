@@ -1,16 +1,18 @@
 CREATE TABLE todolists (
   id serial PRIMARY KEY,
-  title varchar(100) NOT NULL UNIQUE,
+  title text NOT NULL UNIQUE,
   username text NOT NULL
 );
 
 CREATE TABLE todos (
   id serial PRIMARY KEY,
-  title varchar(100) NOT NULL,
-  done boolean DEFAULT false,
+  title text NOT NULL,
+  done boolean NOT NULL DEFAULT false,
   username text NOT NULL,
-  todolist_id int NOT NULL 
-    REFERENCES todolists (id) ON DELETE CASCADE
+  todolist_id integer
+    NOT NULL
+    REFERENCES todolists (id)
+    ON DELETE CASCADE
 );
 
 CREATE TABLE users (
